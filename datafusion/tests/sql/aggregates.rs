@@ -477,6 +477,24 @@ async fn csv_query_approx_percentile_cont() -> Result<()> {
 }
 
 #[tokio::test]
+async fn csv_query_approx_percentile_cont_from_sketch() -> Result<()> {
+    let mut ctx = ExecutionContext::new();
+    register_tdigest_sketch_csv(&mut ctx).await?;
+
+    let sql = "SELECT product_id, approx_percentile_cont_from_sketch(sketch, 0.95, 'tdigest') FROM tdigest_sketch GROUP BY 1";
+    let actual = execute_to_batches(&mut ctx, &sql).await;
+    let expect = [
+        "+------+",
+        "| q    |",
+        "+------+",
+        "| true |",
+        "+------+"
+    ];
+    assert_batches_eq!(expect, &actual);
+    Ok(())
+}
+
+#[tokio::test]
 async fn csv_query_sum_crossjoin() {
     let mut ctx = ExecutionContext::new();
     register_aggregate_csv_by_sql(&mut ctx).await;

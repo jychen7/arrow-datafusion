@@ -53,6 +53,7 @@ pub enum AggregateFunction {
     Correlation,
     /// Approximate continuous percentile function
     ApproxPercentileCont,
+    ApproxPercentileContFromSketch,
     /// ApproxMedian
     ApproxMedian,
 }
@@ -86,6 +87,7 @@ impl FromStr for AggregateFunction {
             "covar_pop" => AggregateFunction::CovariancePop,
             "corr" => AggregateFunction::Correlation,
             "approx_percentile_cont" => AggregateFunction::ApproxPercentileCont,
+            "approx_percentile_cont_from_sketch" => AggregateFunction::ApproxPercentileContFromSketch,
             "approx_median" => AggregateFunction::ApproxMedian,
             _ => {
                 return Err(DataFusionError::Plan(format!(

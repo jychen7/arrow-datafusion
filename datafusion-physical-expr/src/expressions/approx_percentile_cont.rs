@@ -102,6 +102,10 @@ impl ApproxPercentileCont {
             percentile,
         })
     }
+
+    pub fn percentile(&self) -> f64 {
+        self.percentile
+    }
 }
 
 impl AggregateExpr for ApproxPercentileCont {
@@ -167,7 +171,7 @@ impl AggregateExpr for ApproxPercentileCont {
             | DataType::Int64
             | DataType::Float32
             | DataType::Float64) => {
-                Box::new(ApproxPercentileAccumulator::new(self.percentile, t.clone()))
+                Box::new(ApproxPercentileAccumulator::new(TDigest::DEFAULT_COMPRESSION, self.percentile, t.clone()))
             }
             other => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -192,12 +196,39 @@ pub struct ApproxPercentileAccumulator {
 }
 
 impl ApproxPercentileAccumulator {
-    pub fn new(percentile: f64, return_type: DataType) -> Self {
+    pub fn new(compression: usize, percentile: f64, return_type: DataType) -> Self {
         Self {
-            digest: TDigest::new(100),
+            digest: TDigest::new(compression),
             percentile,
             return_type,
         }
+    }
+
+    pub(crate) fn new_with_digest(digest: TDigest, percentile: f64, return_type: DataType) -> Self {
+        Self {
+            digest,
+            percentile,
+            return_type,
+        }
+    }
+
+    pub(crate) fn digest(&self) -> TDigest {
+        self.digest.clone()
+    }
+
+    pub(crate) fn merge_non_empty_batch(&self, states: &[ArrayRef]) -> Result<TDigest> {
+        let states = (0..states[0].len())
+            .map(|index| {
+                states
+                    .iter()
+                    .map(|array| ScalarValue::try_from_array(array, index))
+                    .collect::<Result<Vec<_>>>()
+                    .map(|state| TDigest::from_scalar_state(&state))
+            })
+            .chain(iter::once(Ok(self.digest.clone())))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(TDigest::merge_digests(&states))
     }
 }
 
@@ -290,19 +321,7 @@ impl Accumulator for ApproxPercentileAccumulator {
         if states.is_empty() {
             return Ok(());
         };
-
-        let states = (0..states[0].len())
-            .map(|index| {
-                states
-                    .iter()
-                    .map(|array| ScalarValue::try_from_array(array, index))
-                    .collect::<Result<Vec<_>>>()
-                    .map(|state| TDigest::from_scalar_state(&state))
-            })
-            .chain(iter::once(Ok(self.digest.clone())))
-            .collect::<Result<Vec<_>>>()?;
-
-        self.digest = TDigest::merge_digests(&states);
+        self.digest = self.merge_non_empty_batch(states)?;
 
         Ok(())
     }

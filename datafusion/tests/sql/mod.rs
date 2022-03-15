@@ -523,6 +523,20 @@ async fn register_aggregate_csv(ctx: &mut ExecutionContext) -> Result<()> {
     Ok(())
 }
 
+async fn register_tdigest_sketch_csv(ctx: &mut ExecutionContext) -> Result<()> {
+    let schema = Schema::new(vec![
+        Field::new("product_id", DataType::Int8, false),
+        Field::new("sketch", DataType::Utf8, false),
+    ]);
+    ctx.register_csv(
+        "tdigest_sketch",
+        "sketch-testing/tdigest_sketch.csv",
+        CsvReadOptions::new().schema(&schema),
+    )
+    .await?;
+    Ok(())
+}
+
 /// Execute SQL and return results as a RecordBatch
 async fn plan_and_collect(
     ctx: &mut ExecutionContext,

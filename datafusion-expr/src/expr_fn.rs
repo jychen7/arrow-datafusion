@@ -166,6 +166,15 @@ pub fn approx_percentile_cont(expr: Expr, percentile: Expr) -> Expr {
     }
 }
 
+/// Calculate an approximation of the specified `percentile` for `expr` of `sketch_type`.
+pub fn approx_percentile_cont_from_sketch(expr: Expr, percentile: Expr, sketch_type: Expr) -> Expr {
+    Expr::AggregateFunction {
+        fun: aggregate_function::AggregateFunction::ApproxPercentileContFromSketch,
+        distinct: false,
+        args: vec![expr, percentile, sketch_type],
+    }
+}
+
 // TODO(kszucs): this seems buggy, unary_scalar_expr! is used for many
 // varying arity functions
 /// Create an convenience function representing a unary scalar function

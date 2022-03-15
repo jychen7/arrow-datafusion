@@ -312,6 +312,7 @@ impl From<&AggregateFunction> for protobuf::AggregateFunction {
             AggregateFunction::StddevPop => Self::StddevPop,
             AggregateFunction::Correlation => Self::Correlation,
             AggregateFunction::ApproxPercentileCont => Self::ApproxPercentileCont,
+            AggregateFunction::ApproxPercentileContFromSketch => Self::ApproxPercentileContFromSketch,
             AggregateFunction::ApproxMedian => Self::ApproxMedian,
         }
     }
@@ -468,6 +469,9 @@ impl TryFrom<&Expr> for protobuf::LogicalExprNode {
                     }
                     AggregateFunction::ApproxPercentileCont => {
                         protobuf::AggregateFunction::ApproxPercentileCont
+                    }
+                    AggregateFunction::ApproxPercentileContFromSketch => {
+                        protobuf::AggregateFunction::ApproxPercentileContFromSketch
                     }
                     AggregateFunction::ArrayAgg => protobuf::AggregateFunction::ArrayAgg,
                     AggregateFunction::Min => protobuf::AggregateFunction::Min,

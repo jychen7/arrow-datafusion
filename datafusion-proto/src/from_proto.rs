@@ -421,6 +421,9 @@ impl From<protobuf::AggregateFunction> for AggregateFunction {
             protobuf::AggregateFunction::ApproxPercentileCont => {
                 Self::ApproxPercentileCont
             }
+            protobuf::AggregateFunction::ApproxPercentileContFromSketch => {
+                Self::ApproxPercentileContFromSketch
+            }
             protobuf::AggregateFunction::ApproxMedian => Self::ApproxMedian,
         }
     }

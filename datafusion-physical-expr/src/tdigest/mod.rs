@@ -26,6 +26,9 @@
 //!
 //! [TDigest sketch algorithm]: https://arxiv.org/abs/1902.04023
 //! [Facebook's Folly TDigest]: https://github.com/facebook/folly/blob/main/folly/stats/TDigest.h
+extern crate base64;
+use std::io::Cursor;
+use byteorder::{BigEndian, ReadBytesExt};
 
 use arrow::datatypes::DataType;
 use datafusion_common::DataFusionError;
@@ -33,6 +36,8 @@ use datafusion_common::Result;
 use datafusion_common::ScalarValue;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
+
+const VERBOSE_ENCODING: u32 = 1;
 
 // Cast a non-null [`ScalarValue::Float64`] to an [`OrderedFloat<f64>`], or
 // panic.
@@ -170,7 +175,7 @@ impl Default for Centroid {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct TDigest {
     centroids: Vec<Centroid>,
-    max_size: usize,
+    compression: usize,
     sum: OrderedFloat<f64>,
     count: OrderedFloat<f64>,
     max: OrderedFloat<f64>,
@@ -178,10 +183,12 @@ pub(crate) struct TDigest {
 }
 
 impl TDigest {
-    pub(crate) fn new(max_size: usize) -> Self {
+    pub const DEFAULT_COMPRESSION: usize = 100;
+
+    pub(crate) fn new(compression: usize) -> Self {
         TDigest {
             centroids: Vec::new(),
-            max_size,
+            compression,
             sum: OrderedFloat::from(0.0),
             count: OrderedFloat::from(0.0),
             max: OrderedFloat::from(std::f64::NAN),
@@ -205,8 +212,8 @@ impl TDigest {
     }
 
     #[inline]
-    pub(crate) fn max_size(&self) -> usize {
-        self.max_size
+    pub(crate) fn compression(&self) -> usize {
+        self.compression
     }
 }
 
@@ -214,7 +221,7 @@ impl Default for TDigest {
     fn default() -> Self {
         TDigest {
             centroids: Vec::new(),
-            max_size: 100,
+            compression: TDigest::DEFAULT_COMPRESSION,
             sum: OrderedFloat::from(0.0),
             count: OrderedFloat::from(0.0),
             max: OrderedFloat::from(std::f64::NAN),
@@ -271,7 +278,7 @@ impl TDigest {
             return self.clone();
         }
 
-        let mut result = TDigest::new(self.max_size());
+        let mut result = TDigest::new(self.compression());
         result.count = OrderedFloat::from(self.count() + (sorted_values.len() as f64));
 
         let maybe_min = *sorted_values.first().unwrap();
@@ -285,11 +292,11 @@ impl TDigest {
             result.max = maybe_max;
         }
 
-        let mut compressed: Vec<Centroid> = Vec::with_capacity(self.max_size);
+        let mut compressed: Vec<Centroid> = Vec::with_capacity(self.compression);
 
         let mut k_limit: f64 = 1.0;
         let mut q_limit_times_count =
-            Self::k_to_q(k_limit, self.max_size as f64) * result.count();
+            Self::k_to_q(k_limit, self.compression as f64) * result.count();
         k_limit += 1.0;
 
         let mut iter_centroids = self.centroids.iter().peekable();
@@ -339,7 +346,7 @@ impl TDigest {
 
                 compressed.push(curr.clone());
                 q_limit_times_count =
-                    Self::k_to_q(k_limit, self.max_size as f64) * result.count();
+                    Self::k_to_q(k_limit, self.compression as f64) * result.count();
                 k_limit += 1.0;
                 curr = next;
             }
@@ -408,7 +415,7 @@ impl TDigest {
             return TDigest::default();
         }
 
-        let max_size = digests.first().unwrap().max_size;
+        let compression = digests.first().unwrap().compression;
         let mut centroids: Vec<Centroid> = Vec::with_capacity(n_centroids);
         let mut starts: Vec<usize> = Vec::with_capacity(digests.len());
 
@@ -452,12 +459,12 @@ impl TDigest {
             digests_per_block *= 2;
         }
 
-        let mut result = TDigest::new(max_size);
-        let mut compressed: Vec<Centroid> = Vec::with_capacity(max_size);
+        let mut result = TDigest::new(compression);
+        let mut compressed: Vec<Centroid> = Vec::with_capacity(compression);
 
         let mut k_limit: f64 = 1.0;
         let mut q_limit_times_count =
-            Self::k_to_q(k_limit, max_size as f64) * (count as f64);
+            Self::k_to_q(k_limit, compression as f64) * (count as f64);
 
         let mut iter_centroids = centroids.iter_mut();
         let mut curr = iter_centroids.next().unwrap();
@@ -479,7 +486,7 @@ impl TDigest {
                 weights_to_merge = OrderedFloat::from(0.0);
                 compressed.push(curr.clone());
                 q_limit_times_count =
-                    Self::k_to_q(k_limit, max_size as f64) * (count as f64);
+                    Self::k_to_q(k_limit, compression as f64) * (count as f64);
                 k_limit += 1.0;
                 curr = centroid;
             }
@@ -577,9 +584,9 @@ impl TDigest {
     ///
     /// ```text
     ///
-    ///    ┌────────┬────────┬────────┬───────┬────────┬────────┐
-    ///    │max_size│  sum   │ count  │  max  │  min   │centroid│
-    ///    └────────┴────────┴────────┴───────┴────────┴────────┘
+    ///    ┌───────────┬────────┬────────┬───────┬────────┬────────┐
+    ///    │compression│  sum   │ count  │  max  │  min   │centroid│
+    ///    └───────────┴────────┴────────┴───────┴────────┴────────┘
     ///                                                     │
     ///                               ┌─────────────────────┘
     ///                               ▼
@@ -613,7 +620,7 @@ impl TDigest {
             .collect();
 
         vec![
-            ScalarValue::UInt64(Some(self.max_size as u64)),
+            ScalarValue::UInt64(Some(self.compression as u64)),
             ScalarValue::Float64(Some(self.sum.into_inner())),
             ScalarValue::Float64(Some(self.count.into_inner())),
             ScalarValue::Float64(Some(self.max.into_inner())),
@@ -633,9 +640,9 @@ impl TDigest {
     pub(crate) fn from_scalar_state(state: &[ScalarValue]) -> Self {
         assert_eq!(state.len(), 6, "invalid TDigest state");
 
-        let max_size = match &state[0] {
+        let compression = match &state[0] {
             ScalarValue::UInt64(Some(v)) => *v as usize,
-            v => panic!("invalid max_size type {:?}", v),
+            v => panic!("invalid compression type {:?}", v),
         };
 
         let centroids: Vec<_> = match &state[5] {
@@ -651,12 +658,44 @@ impl TDigest {
         assert!(max >= min);
 
         Self {
-            max_size,
+            compression,
             sum: cast_scalar_f64!(state[1]),
             count: cast_scalar_f64!(&state[2]),
             max,
             min,
             centroids,
+        }
+    }
+
+    pub(crate) fn from_utf8(serialized_sketch: String) -> Self {
+        let bytes = base64::decode(serialized_sketch).unwrap();
+        let mut rdr = Cursor::new(bytes);
+        // encoding_mode, min, max, max_size, count, centroid (weight, mean)
+        let version = rdr.read_u32::<BigEndian>().unwrap();
+        if version != VERBOSE_ENCODING {
+            panic!("invalid encoding version {:?} in serialized_sketch", version)
+        }
+
+        let min: f64 = rdr.read_f64::<BigEndian>().unwrap();
+        let max: f64 = rdr.read_f64::<BigEndian>().unwrap();
+        let compression: usize = rdr.read_f64::<BigEndian>().unwrap() as usize;
+        let count = rdr.read_u32::<BigEndian>().unwrap();
+        let mut centroids = vec![];
+        let mut sum: OrderedFloat<f64> = OrderedFloat::from(0.0);
+        for _ in 0..count {
+            let weight: OrderedFloat<f64> = OrderedFloat::from(rdr.read_f64::<BigEndian>().unwrap());
+            let mean: OrderedFloat<f64> = OrderedFloat::from(rdr.read_f64::<BigEndian>().unwrap());
+
+            sum += weight * mean;
+            centroids.push(Centroid::new(mean, weight));
+        }
+        Self {
+            compression: compression,
+            sum: OrderedFloat::from(sum),
+            count: OrderedFloat::from(count as f64),
+            max: OrderedFloat::from(max),
+            min: OrderedFloat::from(min),
+            centroids: centroids,            
         }
     }
 }

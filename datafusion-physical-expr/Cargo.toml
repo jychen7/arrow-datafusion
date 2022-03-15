@@ -55,3 +55,5 @@ hashbrown = { version = "0.12", features = ["raw"] }
 chrono = { version = "0.4", default-features = false }
 regex = { version = "^1.4.3", optional = true }
 unicode-segmentation = { version = "^1.7.1", optional = true }
+base64 = { version = "0.13.0" }
+byteorder = { version = "0.5.1" }
