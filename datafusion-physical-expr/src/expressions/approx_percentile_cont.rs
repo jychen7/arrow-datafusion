@@ -220,6 +220,7 @@ impl ApproxPercentileAccumulator {
         self.digest.clone()
     }
 
+    // TODO: can be moduler method, not instance method
     pub(crate) fn merge_non_empty_batch(&self, states: &[ArrayRef]) -> Result<TDigest> {
         let states = (0..states[0].len())
             .map(|index| {
