@@ -182,7 +182,7 @@ impl Accumulator for ApproxPercentileFromSketchAccumulator {
             }
         };
 
-        if self.approx_percentile_cont_accumulator.is_none() {
+        if !self.approx_percentile_cont_accumulator.is_none() {
             digests.push(self.approx_percentile_cont_accumulator.as_ref().unwrap().digest())
         }
         let merged_digest = TDigest::merge_digests(&digests);
@@ -199,6 +199,9 @@ impl Accumulator for ApproxPercentileFromSketchAccumulator {
             return Ok(());
         };
 
+        if self.approx_percentile_cont_accumulator.is_none() {
+            self.approx_percentile_cont_accumulator = Some(ApproxPercentileAccumulator::new(TDigest::DEFAULT_COMPRESSION, self.percentile, self.return_type.clone()));
+        }
         let merged_digest = self.approx_percentile_cont_accumulator.as_ref().unwrap().merge_non_empty_batch(states)?;
         self.approx_percentile_cont_accumulator = Some(ApproxPercentileAccumulator::new_with_digest(merged_digest, self.percentile, self.return_type.clone()));
 

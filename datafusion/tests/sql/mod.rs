@@ -524,13 +524,14 @@ async fn register_aggregate_csv(ctx: &mut ExecutionContext) -> Result<()> {
 }
 
 async fn register_tdigest_sketch_csv(ctx: &mut ExecutionContext) -> Result<()> {
+    let testdata = datafusion::test_util::arrow_sketch_data();
     let schema = Schema::new(vec![
         Field::new("product_id", DataType::Int8, false),
         Field::new("sketch", DataType::Utf8, false),
     ]);
     ctx.register_csv(
         "tdigest_sketch",
-        "sketch-testing/tdigest_sketch.csv",
+        &format!("{}/tdigest_sketch.csv", testdata),
         CsvReadOptions::new().schema(&schema),
     )
     .await?;

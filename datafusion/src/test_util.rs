@@ -162,6 +162,13 @@ pub fn arrow_test_data() -> String {
     }
 }
 
+pub fn arrow_sketch_data() -> String {
+    match get_data_dir("SKETCH_TEST_DATA", "../sketch-testing/data") {
+        Ok(pb) => pb.display().to_string(),
+        Err(err) => panic!("failed to get sketch data dir: {}", err),
+    }
+}
+
 /// Returns the parquet test data directory, which is by default
 /// stored in a git submodule rooted at
 /// `parquest-testing/data`.

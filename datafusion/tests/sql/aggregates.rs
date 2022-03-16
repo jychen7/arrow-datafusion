@@ -481,14 +481,21 @@ async fn csv_query_approx_percentile_cont_from_sketch() -> Result<()> {
     let mut ctx = ExecutionContext::new();
     register_tdigest_sketch_csv(&mut ctx).await?;
 
-    let sql = "SELECT product_id, approx_percentile_cont_from_sketch(sketch, 0.95, 'tdigest') FROM tdigest_sketch GROUP BY 1";
+    let sql = "SELECT product_id, approx_percentile_cont_from_sketch(sketch, 0.95, 'tdigest') as p95 FROM tdigest_sketch GROUP BY 1 ORDER BY 1";
     let actual = execute_to_batches(&mut ctx, &sql).await;
     let expect = [
-        "+------+",
-        "| q    |",
-        "+------+",
-        "| true |",
-        "+------+"
+        "+------------+--------------------+",
+        "| product_id | p95                |",
+        "+------------+--------------------+",
+        "| 0          | 0.8105937291534204 |",
+        "| 1          | 0.9667590635506703 |",
+        "| 2          | 0.9550943323447759 |",
+        "| 3          | 0.9106909999133985 |",
+        "| 4          | 0.8632307896782135 |",
+        "| 7          | 0.9404603049585754 |",
+        "| 8          | 0.9660033702711989 |",
+        "| 9          | 0.8639950907022977 |",
+        "+------------+--------------------+",
     ];
     assert_batches_eq!(expect, &actual);
     Ok(())
