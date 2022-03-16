@@ -27,8 +27,8 @@
 //! [TDigest sketch algorithm]: https://arxiv.org/abs/1902.04023
 //! [Facebook's Folly TDigest]: https://github.com/facebook/folly/blob/main/folly/stats/TDigest.h
 extern crate base64;
-use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
+use std::io::Cursor;
 
 use arrow::datatypes::DataType;
 use datafusion_common::DataFusionError;
@@ -673,7 +673,10 @@ impl TDigest {
         // encoding_mode, min, max, max_size, count, centroid (weight, mean)
         let version = rdr.read_u32::<BigEndian>().unwrap();
         if version != VERBOSE_ENCODING {
-            panic!("invalid encoding version {:?} in serialized_sketch", version)
+            panic!(
+                "invalid encoding version {:?} in serialized_sketch",
+                version
+            )
         }
 
         let min: f64 = rdr.read_f64::<BigEndian>().unwrap();
@@ -683,8 +686,10 @@ impl TDigest {
         let mut centroids = vec![];
         let mut sum: OrderedFloat<f64> = OrderedFloat::from(0.0);
         for _ in 0..count {
-            let weight: OrderedFloat<f64> = OrderedFloat::from(rdr.read_f64::<BigEndian>().unwrap());
-            let mean: OrderedFloat<f64> = OrderedFloat::from(rdr.read_f64::<BigEndian>().unwrap());
+            let weight: OrderedFloat<f64> =
+                OrderedFloat::from(rdr.read_f64::<BigEndian>().unwrap());
+            let mean: OrderedFloat<f64> =
+                OrderedFloat::from(rdr.read_f64::<BigEndian>().unwrap());
 
             sum += weight * mean;
             centroids.push(Centroid::new(mean, weight));
@@ -695,7 +700,7 @@ impl TDigest {
             count: OrderedFloat::from(count as f64),
             max: OrderedFloat::from(max),
             min: OrderedFloat::from(min),
-            centroids: centroids,            
+            centroids: centroids,
         }
     }
 }

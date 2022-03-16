@@ -18,10 +18,10 @@
 //! Support the coercion rule for aggregate function.
 
 use crate::expressions::{
+    is_approx_percentile_cont_from_sketch_supported_arg_type,
     is_approx_percentile_cont_supported_arg_type, is_avg_support_arg_type,
     is_correlation_support_arg_type, is_covariance_support_arg_type,
     is_stddev_support_arg_type, is_sum_support_arg_type, is_variance_support_arg_type,
-    is_approx_percentile_cont_from_sketch_supported_arg_type,
     try_cast,
 };
 use crate::PhysicalExpr;
@@ -154,11 +154,12 @@ pub fn coerce_types(
             Ok(input_types.to_vec())
         }
         AggregateFunction::ApproxPercentileContFromSketch => {
-            if !is_approx_percentile_cont_from_sketch_supported_arg_type(&input_types[0]) {
+            if !is_approx_percentile_cont_from_sketch_supported_arg_type(&input_types[0])
+            {
                 return Err(DataFusionError::Plan(format!(
                     "The function {:?} does not support inputs of type {:?}.",
                     agg_fun, input_types[0]
-                )));                
+                )));
             }
             if !matches!(input_types[1], DataType::Float64) {
                 return Err(DataFusionError::Plan(format!(
@@ -170,10 +171,9 @@ pub fn coerce_types(
                 return Err(DataFusionError::Plan(format!(
                     "The sketch_type argument for {:?} must be Utf8, not {:?}.",
                     agg_fun, input_types[2]
-                )));   
+                )));
             }
             Ok(input_types.to_vec())
-
         }
         AggregateFunction::ApproxMedian => {
             if !is_approx_percentile_cont_supported_arg_type(&input_types[0]) {

@@ -312,7 +312,9 @@ impl From<&AggregateFunction> for protobuf::AggregateFunction {
             AggregateFunction::StddevPop => Self::StddevPop,
             AggregateFunction::Correlation => Self::Correlation,
             AggregateFunction::ApproxPercentileCont => Self::ApproxPercentileCont,
-            AggregateFunction::ApproxPercentileContFromSketch => Self::ApproxPercentileContFromSketch,
+            AggregateFunction::ApproxPercentileContFromSketch => {
+                Self::ApproxPercentileContFromSketch
+            }
             AggregateFunction::ApproxMedian => Self::ApproxMedian,
         }
     }

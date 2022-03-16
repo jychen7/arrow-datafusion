@@ -204,7 +204,11 @@ impl ApproxPercentileAccumulator {
         }
     }
 
-    pub(crate) fn new_with_digest(digest: TDigest, percentile: f64, return_type: DataType) -> Self {
+    pub(crate) fn new_with_digest(
+        digest: TDigest,
+        percentile: f64,
+        return_type: DataType,
+    ) -> Self {
         Self {
             digest,
             percentile,

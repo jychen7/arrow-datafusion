@@ -353,13 +353,19 @@ pub(super) fn signature(fun: &AggregateFunction) -> Signature {
         AggregateFunction::Correlation => {
             Signature::uniform(2, NUMERICS.to_vec(), Volatility::Immutable)
         }
-        AggregateFunction::ApproxPercentileContFromSketch => {
-            Signature::one_of(
-                STRINGS.iter()
-                    .map(|t| TypeSignature::Exact(vec![t.clone(), DataType::Float64, DataType::Utf8]))
-                    .collect(),
-                Volatility::Immutable)
-        }
+        AggregateFunction::ApproxPercentileContFromSketch => Signature::one_of(
+            STRINGS
+                .iter()
+                .map(|t| {
+                    TypeSignature::Exact(vec![
+                        t.clone(),
+                        DataType::Float64,
+                        DataType::Utf8,
+                    ])
+                })
+                .collect(),
+            Volatility::Immutable,
+        ),
         AggregateFunction::ApproxPercentileCont => Signature::one_of(
             // Accept any numeric value paired with a float64 percentile
             NUMERICS

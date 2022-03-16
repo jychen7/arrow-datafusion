@@ -16,13 +16,11 @@
 // under the License.
 
 use super::Literal;
-use crate::{tdigest::TDigest, AggregateExpr, PhysicalExpr};
-use crate::expressions::ApproxPercentileCont;
 use crate::expressions::approx_percentile_cont::ApproxPercentileAccumulator;
+use crate::expressions::ApproxPercentileCont;
+use crate::{tdigest::TDigest, AggregateExpr, PhysicalExpr};
 use arrow::{
-    array::{
-        ArrayRef, StringArray
-    },
+    array::{ArrayRef, StringArray},
     datatypes::{DataType, Field},
 };
 use datafusion_common::DataFusionError;
@@ -39,18 +37,17 @@ pub enum SketchType {
 impl SketchType {
     fn from_str(value: String) -> Result<SketchType> {
         if value == "tdigest" {
-            return Ok(SketchType::TDigest)
+            return Ok(SketchType::TDigest);
         }
         Err(DataFusionError::Internal(
-                    "desired sketch_type should be one of [tdigest]".to_string(),
+            "desired sketch_type should be one of [tdigest]".to_string(),
         ))
     }
 }
-pub fn is_approx_percentile_cont_from_sketch_supported_arg_type(arg_type: &DataType) -> bool {
-    matches!(
-        arg_type,
-        DataType::Utf8 | DataType::LargeUtf8
-    )
+pub fn is_approx_percentile_cont_from_sketch_supported_arg_type(
+    arg_type: &DataType,
+) -> bool {
+    matches!(arg_type, DataType::Utf8 | DataType::LargeUtf8)
 }
 
 #[derive(Debug)]
@@ -70,7 +67,8 @@ impl ApproxPercentileContFromSketch {
 
         let heads = expr[0..=1].to_vec();
         let tail = &expr[2];
-        let approx_percentile_cont = ApproxPercentileCont::new(heads, name, DataType::Float64)?;
+        let approx_percentile_cont =
+            ApproxPercentileCont::new(heads, name, DataType::Float64)?;
         // Extract the sketch_type literal
         let lit = tail
             .as_any()
@@ -104,7 +102,11 @@ impl AggregateExpr for ApproxPercentileContFromSketch {
     }
 
     fn field(&self) -> Result<Field> {
-        Ok(Field::new(&self.approx_percentile_cont.name(), DataType::Float64, false))
+        Ok(Field::new(
+            &self.approx_percentile_cont.name(),
+            DataType::Float64,
+            false,
+        ))
     }
 
     #[allow(rustdoc::private_intra_doc_links)]
@@ -119,7 +121,12 @@ impl AggregateExpr for ApproxPercentileContFromSketch {
     }
 
     fn create_accumulator(&self) -> Result<Box<dyn Accumulator>> {
-        let accumulator: Box<dyn Accumulator> = Box::new(ApproxPercentileFromSketchAccumulator::new(self.sketch_type.clone(), self.approx_percentile_cont.percentile(), DataType::Float64));
+        let accumulator: Box<dyn Accumulator> =
+            Box::new(ApproxPercentileFromSketchAccumulator::new(
+                self.sketch_type.clone(),
+                self.approx_percentile_cont.percentile(),
+                DataType::Float64,
+            ));
         Ok(accumulator)
     }
 
@@ -149,7 +156,10 @@ impl ApproxPercentileFromSketchAccumulator {
 
 impl Accumulator for ApproxPercentileFromSketchAccumulator {
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        self.approx_percentile_cont_accumulator.as_ref().unwrap().state()
+        self.approx_percentile_cont_accumulator
+            .as_ref()
+            .unwrap()
+            .state()
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -167,10 +177,11 @@ impl Accumulator for ApproxPercentileFromSketchAccumulator {
                 for element in array {
                     match element {
                         Some(serialized_sketch) => {
-                            let digest: TDigest = TDigest::from_utf8(serialized_sketch.to_string());
+                            let digest: TDigest =
+                                TDigest::from_utf8(serialized_sketch.to_string());
                             digests.push(digest);
                         }
-                        _ => ()
+                        _ => (),
                     }
                 }
             }
@@ -183,15 +194,28 @@ impl Accumulator for ApproxPercentileFromSketchAccumulator {
         };
 
         if !self.approx_percentile_cont_accumulator.is_none() {
-            digests.push(self.approx_percentile_cont_accumulator.as_ref().unwrap().digest())
+            digests.push(
+                self.approx_percentile_cont_accumulator
+                    .as_ref()
+                    .unwrap()
+                    .digest(),
+            )
         }
         let merged_digest = TDigest::merge_digests(&digests);
-        self.approx_percentile_cont_accumulator = Some(ApproxPercentileAccumulator::new_with_digest(merged_digest, self.percentile, self.return_type.clone()));
+        self.approx_percentile_cont_accumulator =
+            Some(ApproxPercentileAccumulator::new_with_digest(
+                merged_digest,
+                self.percentile,
+                self.return_type.clone(),
+            ));
         Ok(())
     }
 
     fn evaluate(&self) -> Result<ScalarValue> {
-        self.approx_percentile_cont_accumulator.as_ref().unwrap().evaluate()
+        self.approx_percentile_cont_accumulator
+            .as_ref()
+            .unwrap()
+            .evaluate()
     }
 
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
@@ -200,10 +224,24 @@ impl Accumulator for ApproxPercentileFromSketchAccumulator {
         };
 
         if self.approx_percentile_cont_accumulator.is_none() {
-            self.approx_percentile_cont_accumulator = Some(ApproxPercentileAccumulator::new(TDigest::DEFAULT_COMPRESSION, self.percentile, self.return_type.clone()));
+            self.approx_percentile_cont_accumulator =
+                Some(ApproxPercentileAccumulator::new(
+                    TDigest::DEFAULT_COMPRESSION,
+                    self.percentile,
+                    self.return_type.clone(),
+                ));
         }
-        let merged_digest = self.approx_percentile_cont_accumulator.as_ref().unwrap().merge_non_empty_batch(states)?;
-        self.approx_percentile_cont_accumulator = Some(ApproxPercentileAccumulator::new_with_digest(merged_digest, self.percentile, self.return_type.clone()));
+        let merged_digest = self
+            .approx_percentile_cont_accumulator
+            .as_ref()
+            .unwrap()
+            .merge_non_empty_batch(states)?;
+        self.approx_percentile_cont_accumulator =
+            Some(ApproxPercentileAccumulator::new_with_digest(
+                merged_digest,
+                self.percentile,
+                self.return_type.clone(),
+            ));
 
         Ok(())
     }
