@@ -131,12 +131,23 @@ impl ExternalSorter {
             // NB timer records time taken on drop, so there are no
             // calls to `timer.done()` below.
             let _timer = tracking_metrics.elapsed_compute().timer();
+            debug!(
+                "Start insert_batch for partition {} with input size {}",
+                tracking_metrics.partition(),
+                size
+            );
             let partial = sort_batch(input, self.schema.clone(), &self.expr, self.fetch)?;
 
             // The resulting batch might be smaller (or larger, see #3747) than the input
             // batch due to either a propagated limit or the re-construction of arrays. So
             // for being reliable, we need to reflect the memory usage of the partial batch.
             let new_size = batch_byte_size(&partial.sorted_batch);
+            debug!(
+                "End insert_batch for partition {} with output size {}",
+                tracking_metrics.partition(),
+                new_size
+            );
+
             match new_size.cmp(&size) {
                 Ordering::Greater => {
                     // We don't have to call try_grow here, since we have already used the
@@ -168,6 +179,7 @@ impl ExternalSorter {
         let batch_size = self.session_config.batch_size();
 
         if self.spilled_before() {
+            debug!("Start sort with spill");
             let intermediate_metrics = self
                 .metrics_set
                 .new_intermediate_tracking(self.partition_id, &self.runtime.memory_pool);
@@ -195,6 +207,10 @@ impl ExternalSorter {
                 streams.push(stream);
             }
 
+            debug!(
+                "End sort with spill by pass {} streams to streaming_merge",
+                streams.len()
+            );
             streaming_merge(
                 streams,
                 self.schema.clone(),
@@ -203,6 +219,7 @@ impl ExternalSorter {
                 self.session_config.batch_size(),
             )
         } else if !self.in_mem_batches.is_empty() {
+            debug!("Start sort without spill");
             let tracking_metrics = self
                 .metrics_set
                 .new_final_tracking(self.partition_id, &self.runtime.memory_pool);
@@ -214,6 +231,7 @@ impl ExternalSorter {
                 tracking_metrics,
                 self.fetch,
             );
+            debug!("End sort without spill");
             // Report to the memory manager we are no longer using memory
             self.reservation.free();
             result

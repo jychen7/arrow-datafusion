@@ -32,6 +32,7 @@ use arrow::record_batch::RecordBatch;
 pub struct MemTrackingMetrics {
     reservation: MemoryReservation,
     metrics: BaselineMetrics,
+    partition: usize,
 }
 
 /// Delegates most of the metrics functionalities to the inner BaselineMetrics,
@@ -49,7 +50,13 @@ impl MemTrackingMetrics {
         Self {
             reservation,
             metrics: BaselineMetrics::new(metrics, partition),
+            partition,
         }
+    }
+
+    /// return the partition number
+    pub fn partition(&self) -> usize {
+        self.partition
     }
 
     /// return the metric for cpu time spend in this operator
